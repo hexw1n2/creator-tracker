@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2563eb" id="themeColor">
+<title>Creator Tracker</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root {
+    --accent: #2563eb; --accent-soft: #dbeafe;
+    --bg: #f5f6f8; --card: #fff; --text: #16181d; --muted: #6b7280; --line: #e5e7eb; --chip: #eef0f3;
+    --ok: #15803d; --ok-soft: #dcfce7; --warn: #b45309; --warn-soft: #fef3c7; --bad: #b91c1c; --bad-soft: #fee2e2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1013; --card: #171a20; --text: #e9ebef; --muted: #9aa1ad; --line: #2a2f38; --chip: #222731;
+      --ok: #4ade80; --ok-soft: #10301c; --warn: #fbbf24; --warn-soft: #3a2a0c; --bad: #f87171; --bad-soft: #3a1515;
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  input, select, textarea { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  textarea { min-height: 70px; resize: vertical; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+  button { border: 1px solid var(--line); background: var(--chip); border-radius: 10px; padding: 10px 14px; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.danger { color: var(--bad); }
+  button:disabled { opacity: .5; }
+  a { color: var(--accent); text-decoration: none; }
+
+  header { position: sticky; top: 0; z-index: 5; background: var(--accent); color: #fff; padding: calc(10px + env(safe-area-inset-top)) 16px 10px; display: flex; align-items: center; gap: 10px; }
+  header .camp { flex: 1; min-width: 0; background: rgba(255,255,255,.18); border: 0; color: #fff; text-align: left; padding: 8px 12px; border-radius: 12px; }
+  header .camp small { display: block; opacity: .85; font-size: 11px; }
+  header .camp b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 16px; }
+  header .icon { background: rgba(255,255,255,.18); border: 0; color: #fff; padding: 10px 12px; }
+  main { padding: 14px 16px calc(90px + env(safe-area-inset-bottom)); max-width: 760px; margin: 0 auto; }
+  nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 5; display: flex; background: var(--card); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
+  nav button { flex: 1; border: 0; background: none; border-radius: 0; padding: 10px 2px 12px; font-size: 12px; color: var(--muted); }
+  nav button span { display: block; font-size: 20px; line-height: 1.2; }
+  nav button.on { color: var(--accent); font-weight: 600; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 10px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .grow { flex: 1; min-width: 0; }
+  .muted { color: var(--muted); } .small { font-size: 12px; }
+  .pill { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 99px; background: var(--chip); white-space: nowrap; }
+  .pill.Submitted { background: var(--warn-soft); color: var(--warn); }
+  .pill.Approved { background: var(--accent-soft); color: var(--accent); }
+  .pill.Paid { background: var(--ok-soft); color: var(--ok); }
+  .pill.Rejected { background: var(--bad-soft); color: var(--bad); }
+  .chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 6px; }
+  .chips button { padding: 6px 12px; border-radius: 99px; white-space: nowrap; font-size: 13px; }
+  .chips button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; }
+  .stat b { display: block; font-size: 17px; } .stat span { font-size: 11px; color: var(--muted); }
+  .item { display: flex; gap: 10px; align-items: center; }
+  .item .main { flex: 1; min-width: 0; }
+  .item .main b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .right { text-align: right; white-space: nowrap; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; flex: none; }
+
+  .paste { width: 100%; padding: 34px 16px; font-size: 20px; font-weight: 700; border-radius: 18px; background: var(--accent); color: #fff; border: 0; box-shadow: 0 6px 18px rgba(0,0,0,.12); }
+  .paste small { display: block; font-size: 13px; font-weight: 400; opacity: .9; margin-top: 4px; }
+  .result { font-size: 14px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .result:last-child { border-bottom: 0; }
+  .result.ok { color: var(--ok); } .result.bad { color: var(--bad); }
+
+  .sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 20; display: flex; align-items: flex-end; justify-content: center; }
+  .sheet { background: var(--card); width: 100%; max-width: 760px; max-height: 92vh; overflow-y: auto; border-radius: 18px 18px 0 0; padding: 16px 16px calc(20px + env(safe-area-inset-bottom)); }
+  .sheet h2 { margin: 0 0 8px; font-size: 19px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+  .check { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .check input[type=checkbox] { width: 22px; height: 22px; flex: none; }
+  .warnbox { background: var(--warn-soft); color: var(--warn); border-radius: 10px; padding: 10px 12px; margin: 10px 0; font-size: 14px; }
+  .warnbox label { color: inherit; display: flex; gap: 8px; align-items: center; font-size: 14px; margin: 8px 0 0; }
+  .warnbox input { width: 20px; height: 20px; }
+  .colors { display: flex; gap: 10px; flex-wrap: wrap; }
+  .colors button { width: 38px; height: 38px; border-radius: 50%; padding: 0; border: 3px solid transparent; }
+  .colors button.on { border-color: var(--text); }
+  .toast { position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 14px; border-radius: 10px; z-index: 30; max-width: 90vw; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  .empty { text-align: center; color: var(--muted); padding: 30px 10px; }
+  .login { max-width: 380px; margin: 60px auto; padding: 0 16px; }
+  .login h1 { font-size: 24px; margin: 0 0 6px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script src="vendor/supabase-2.117.3.js"></script>
+<script>
+// ---------- Config ----------
+const SUPABASE_URL = 'https://kitugmudlzqltsajqipt.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_ES8uoCdTNgcHDR6MAdcoOQ_ZqsfANwx';  // publishable: safe in the browser, data is locked by row level security
+const COLORS = {
+  blue: '#2563eb', red: '#dc2626', green: '#16a34a', orange: '#ea580c',
+  purple: '#9333ea', pink: '#db2777', teal: '#0d9488', black: '#374151',
+};
+const STATUSES = ['Submitted', 'Approved', 'Rejected', 'Paid'];
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ---------- State ----------
+const S = {
+  session: null, owner: false, tab: 'add', videoFilter: 'all', creatorSearch: '',
+  settings: null, campaigns: [], creators: [], videos: [], payouts: [], results: [],
+};
+
+// ---------- Helpers ----------
+const $ = sel => document.querySelector(sel);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const money = n => '$' + (Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const compact = n => n == null ? '–' : Number(n).toLocaleString(undefined, { notation: 'compact', maximumFractionDigits: 1 });
+const day = iso => iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+const numOrNull = v => (v === '' || v == null) ? null : Number(String(v).replace(/[^\d.]/g, ''));
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+};
+
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+async function q(promise) {
+  const { data, error } = await promise;
+  if (error) { toast(error.message); throw error; }
+  return data;
+}
+
+const current = () => S.campaigns.find(c => c.id === S.settings?.current_campaign_id) || S.campaigns[0];
+const campVideos = () => S.videos.filter(v => v.campaign_id === current()?.id);
+const colorOf = c => COLORS[c?.color] || COLORS.blue;
+
+function applyTheme() {
+  const col = colorOf(current());
+  document.documentElement.style.setProperty('--accent', col);
+  document.documentElement.style.setProperty('--accent-soft', col + '22');
+  $('#themeColor').setAttribute('content', col);
+}
+
+// ---------- Data ----------
+async function loadAll() {
+  const [settings, campaigns, creators, videos, payouts] = await Promise.all([
+    q(sb.from('settings').select('*').eq('id', 1).single()),
+    q(sb.from('campaign_totals').select('*').order('started_at')),
+    q(sb.from('creators').select('*').order('handle')),
+    q(sb.from('videos_v').select('*').order('posted_at', { ascending: false })),
+    q(sb.from('payouts').select('*, payout_items(video_id, amount)').order('paid_at', { ascending: false })),
+  ]);
+  Object.assign(S, { settings, campaigns, creators, videos, payouts });
+  applyTheme();
+  render();
+}
+
+// ---------- Auth ----------
+async function init() {
+  const { data } = await sb.auth.getSession();
+  S.session = data.session;
+  sb.auth.onAuthStateChange((_e, session) => {
+    const changed = !!session !== !!S.session;
+    S.session = session;
+    if (changed) boot();
+  });
+  boot();
+}
+
+async function boot() {
+  if (!S.session) return renderLogin();
+  const { data } = await sb.rpc('is_owner');
+  S.owner = data === true;
+  if (!S.owner) {
+    $('#app').innerHTML = `<div class="login"><h1>No access</h1>
+      <p class="muted">Signed in as ${esc(S.session.user.email)}, which isn't allowed to use this tracker.</p>
+      <button onclick="sb.auth.signOut()">Sign out</button></div>`;
+    return;
+  }
+  await loadAll();
+  maybeAutoPaste();
+}
+
+function renderLogin(msg) {
+  $('#app').innerHTML = `<div class="login">
+    <h1>Creator Tracker</h1>
+    <p class="muted">Sign in with your email and password.</p>
+    <label>Email</label><input id="em" type="email" autocomplete="username" value="${esc(store.get('email') || '')}">
+    <label>Password</label><input id="pw" type="password" autocomplete="current-password">
+    <div class="row" style="margin-top:14px">
+      <button class="primary grow" onclick="signIn()">Sign in</button>
+      <button onclick="signUp()">Create account</button>
+    </div>
+    <p class="small" id="loginMsg" style="margin-top:12px">${esc(msg || '')}</p>
+  </div>`;
+}
+
+async function signIn() {
+  const email = $('#em').value.trim(), password = $('#pw').value;
+  store.set('email', email);
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) $('#loginMsg').textContent = error.message;
+}
+
+async function signUp() {
+  const email = $('#em').value.trim(), password = $('#pw').value;
+  if (password.length < 8) { $('#loginMsg').textContent = 'Use at least 8 characters for the password.'; return; }
+  store.set('email', email);
+  const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + location.pathname } });
+  if (error) { $('#loginMsg').textContent = error.message; return; }
+  if (!data.session) $('#loginMsg').textContent = 'Account created. Open the confirmation email, then come back and sign in.';
+}
+
+// ---------- Render ----------
+function render() {
+  const c = current();
+  const tabs = [['add', '＋', 'Add'], ['videos', '▶', 'Videos'], ['creators', '☺', 'Creators'], ['payouts', '$', 'Payouts'], ['campaigns', '◑', 'Campaigns']];
+  $('#app').innerHTML = `
+    <header>
+      <button class="camp" onclick="openCampaignPicker()">
+        <small>Current campaign ▾</small><b>${esc(c?.name || 'No campaign')}</b>
+      </button>
+      <button class="icon" title="Settings" onclick="openSettings()">⚙</button>
+    </header>
+    <main id="main">${{ add: viewAdd, videos: viewVideos, creators: viewCreators, payouts: viewPayouts, campaigns: viewCampaigns }[S.tab]()}</main>
+    <nav>${tabs.map(([k, i, l]) => `<button class="${S.tab === k ? 'on' : ''}" onclick="go('${k}')"><span>${i}</span>${l}</button>`).join('')}</nav>`;
+}
+
+function go(tab) { S.tab = tab; render(); window.scrollTo(0, 0); }
+
+// ---------- Add ----------
+function viewAdd() {
+  const vids = campVideos();
+  const auto = store.get('autoPaste') !== 'off';
+  return `
+    <button class="paste" onclick="pasteFromClipboard()">📋 Paste link<small>Adds the TikTok link you copied to “${esc(current()?.name)}”</small></button>
+    <div class="card" style="margin-top:12px">
+      ${S.results.length ? S.results.slice(0, 8).map(r => `<div class="result ${r.ok ? 'ok' : 'bad'}">${r.ok ? '✓' : '✕'} ${esc(r.msg)}</div>`).join('')
+        : '<div class="muted small">Copy a link in TikTok, come back, and tap the button. Results show here.</div>'}
+    </div>
+    <div class="card">
+      <label style="margin-top:0">Or type/paste links or @handles (several at once is fine)</label>
+      <textarea id="manual" placeholder="https://www.tiktok.com/@creator/video/…"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="primary" onclick="addManual()">Add</button>
+        <label class="row small" style="margin:0 0 0 auto"><input type="checkbox" style="width:auto" ${auto ? 'checked' : ''} onchange="store.set('autoPaste', this.checked ? 'on' : 'off')"> Auto-add new link when I open the app</label>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>${vids.length}</b><span>videos</span></div>
+      <div class="stat"><b>${vids.filter(v => v.status === 'Submitted').length}</b><span>to review</span></div>
+      <div class="stat"><b>${money(current()?.total_spent)}</b><span>spent</span></div>
+    </div>`;
+}
+
+async function addText(text) {
+  text = String(text || '').trim();
+  if (!text) return;
+  const { data, error } = await sb.functions.invoke('add-links', { body: { text, campaign_id: current()?.id } });
+  if (error) {
+    let msg = error.message;
+    try { msg = (await error.context.json()).error || msg; } catch (e) {}
+    S.results.unshift({ ok: false, msg });
+  } else {
+    S.results.unshift(...data.results.reverse());
+    const added = data.results.filter(r => r.ok).length;
+    if (added) toast(data.results.find(r => r.ok).msg);
+  }
+  await loadAll();
+}
+
+async function pasteFromClipboard() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text.trim()) return toast('Your clipboard is empty. Copy a link in TikTok first.');
+    store.set('lastClip', text.trim());
+    await addText(text);
+  } catch (e) {
+    toast('Couldn’t read the clipboard. Allow clipboard access, or paste into the box below.');
+  }
+}
+
+async function addManual() {
+  const text = $('#manual').value;
+  $('#manual').value = '';
+  await addText(text);
+}
+
+// When you come back from TikTok with a new link copied, add it automatically (if allowed).
+async function maybeAutoPaste() {
+  if (store.get('autoPaste') === 'off' || S.tab !== 'add' || !navigator.clipboard?.readText || maybeAutoPaste.busy) return;
+  maybeAutoPaste.busy = true;
+  try {
+    const perm = await navigator.permissions?.query({ name: 'clipboard-read' }).catch(() => null);
+    if (perm && perm.state !== 'granted') return;   // never prompt unexpectedly; the button asks the first time
+    const text = (await navigator.clipboard.readText()).trim();
+    if (!/tiktok\.com\//i.test(text) || text === store.get('lastClip')) return;
+    store.set('lastClip', text);
+    await addText(text);
+  } catch (e) { /* not focused or not allowed */ }
+  finally { maybeAutoPaste.busy = false; }
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && S.owner) loadAll().then(maybeAutoPaste).catch(() => {});
+});
+// Android only lets a page read the clipboard once it has focus, which can land just after it becomes visible.
+window.addEventListener('focus', () => { if (S.owner) maybeAutoPaste(); });
+
+// ---------- Videos ----------
+function viewVideos() {
+  const f = S.videoFilter;
+  let vids = campVideos();
+  const counts = s => campVideos().filter(v => v.status === s).length;
+  if (f !== 'all') vids = vids.filter(v => v.status === f);
+  const chips = [['all', `All ${campVideos().length}`], ['Submitted', `To review ${counts('Submitted')}`], ['Approved', `Approved ${counts('Approved')}`], ['Paid', `Paid ${counts('Paid')}`], ['Rejected', `Rejected ${counts('Rejected')}`]];
+  return `
+    <div class="chips">${chips.map(([k, l]) => `<button class="${f === k ? 'on' : ''}" onclick="S.videoFilter='${k}';render()">${l}</button>`).join('')}</div>
+    ${vids.length ? vids.map(videoCard).join('') : '<div class="empty">No videos here yet.</div>'}`;
+}
+
+function videoCard(v) {
+  const amount = v.status === 'Paid' ? `<span class="small muted">paid</span> ${money(v.paid_total)}` : money(v.owed);
+  return `<div class="card">
+    <div class="item" onclick="openVideo('${esc(v.id)}')">
+      <div class="main"><b>@${esc(v.creator)}</b>
+        <span class="small muted">${day(v.posted_at)} · ${compact(v.views)} views · …${esc(v.id.slice(-6))}</span></div>
+      <div class="right"><span class="pill ${v.status}">${v.status}</span><div class="small">${amount}</div></div>
+    </div>
+    ${v.status === 'Submitted' ? `<div class="row" style="margin-top:10px">
+      <button class="grow" onclick="setStatus('${esc(v.id)}','Approved')">✓ Approve</button>
+      <button class="grow danger" onclick="setStatus('${esc(v.id)}','Rejected')">✕ Reject</button></div>` : ''}
+  </div>`;
+}
+
+async function setStatus(id, status) {
+  await q(sb.from('videos').update({ status }).eq('id', id));
+  await loadAll();
+}
+
+function openVideo(id) {
+  const v = S.videos.find(x => x.id === id);
+  if (!v) return;
+  const paid = v.status === 'Paid';
+  sheet(`
+    <h2>@${esc(v.creator)}</h2>
+    <div class="small muted">Posted ${day(v.posted_at)} · ID ${esc(v.id)}</div>
+    <p><a href="${esc(v.url)}" target="_blank" rel="noopener">Open in TikTok ↗</a></p>
+    <div class="stats">
+      <div class="stat"><b>${compact(v.views)}</b><span>views</span></div>
+      <div class="stat"><b>${compact(v.likes)}</b><span>likes</span></div>
+      <div class="stat"><b>${paid ? money(v.paid_total) : money(v.owed)}</b><span>${paid ? 'paid (' + esc(v.payout_codes) + ')' : 'owed'}</span></div>
+    </div>
+    <div class="grid2">
+      <div><label>Status</label><select id="vStatus" ${paid ? 'disabled' : ''}>
+        ${STATUSES.filter(s => s !== 'Paid' || paid).map(s => `<option ${s === v.status ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
+      <div><label>Views (type to override)</label><input id="vViews" inputmode="numeric" value="${v.views ?? ''}"></div>
+      <div><label>Fixed amount $ (blank = auto)</label><input id="vOverride" inputmode="decimal" value="${v.amount_override ?? ''}"></div>
+      <div><label>Campaign</label><select id="vCamp">${S.campaigns.map(c => `<option value="${c.id}" ${c.id === v.campaign_id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div>
+    </div>
+    <label>Notes</label><input id="vNotes" value="${esc(v.notes)}">
+    <div class="row" style="margin-top:14px">
+      <button class="primary grow" onclick="saveVideo('${esc(v.id)}')">Save</button>
+      ${paid ? '' : `<button class="danger" onclick="deleteVideo('${esc(v.id)}')">Delete</button>`}
+      <button onclick="closeSheet()">Close</button>
+    </div>`);
+}
+
+async function saveVideo(id) {
+  const v = S.videos.find(x => x.id === id);
+  const fields = {
+    views: numOrNull($('#vViews').value), amount_override: numOrNull($('#vOverride').value),
+    campaign_id: $('#vCamp').value, notes: $('#vNotes').value.trim(),
+  };
+  if (v.status !== 'Paid') fields.status = $('#vStatus').value;
+  await q(sb.from('videos').update(fields).eq('id', id));
+  closeSheet(); toast('Saved'); await loadAll();
+}
+
+async function deleteVideo(id) {
+  if (!confirm('Remove this video from the tracker?')) return;
+  await q(sb.from('videos').delete().eq('id', id));
+  closeSheet(); await loadAll();
+}
+
+// ---------- Creators ----------
+function creatorSummary(c) {
+  const all = S.videos.filter(v => v.creator === c.handle);
+  const here = all.filter(v => v.campaign_id === current()?.id);
+  return {
+    here,
+    owed: here.filter(v => v.status === 'Approved').reduce((s, v) => s + Number(v.owed), 0),
+    review: here.filter(v => v.status === 'Submitted').length,
+    paid: all.reduce((s, v) => s + Number(v.paid_total), 0),
+  };
+}
+
+function payTerms(c) {
+  const s = S.settings, pick = (a, b) => a ?? b;
+  const rate = Number(pick(c.rate_per_video, s.default_rate)), cpm = Number(pick(c.cpm, s.default_cpm));
+  const tiers = c.bonus_tiers || s.default_bonus_tiers, max = Number(pick(c.max_per_video, s.default_max));
+  const parts = [];
+  if (rate) parts.push(money(rate) + '/video');
+  if (cpm) parts.push(money(cpm) + '/1K views');
+  if (tiers) parts.push('tiers ' + tiers);
+  if (max) parts.push('cap ' + money(max));
+  return parts.join(' + ') || 'no rate set';
+}
+
+function viewCreators() {
+  const qy = S.creatorSearch.toLowerCase().replace(/^@/, '');
+  const rows = S.creators.map(c => ({ c, s: creatorSummary(c) }))
+    .filter(r => !qy || r.c.handle.includes(qy) || (r.c.name || '').toLowerCase().includes(qy))
+    .sort((a, b) => b.s.here.length - a.s.here.length || b.s.owed - a.s.owed);
+  return `
+    <input placeholder="Search creators…" value="${esc(S.creatorSearch)}" oninput="S.creatorSearch=this.value;clearTimeout(window._st);window._st=setTimeout(()=>{render();const i=document.querySelector('main input');i.focus();i.setSelectionRange(i.value.length,i.value.length)},250)" style="margin-bottom:10px">
+    ${rows.length ? rows.map(({ c, s }) => `<div class="card" onclick="openCreator('${esc(c.handle)}')">
+      <div class="item"><div class="main"><b>@${esc(c.handle)} ${c.name ? `<span class="muted small">${esc(c.name)}</span>` : ''}</b>
+        <span class="small muted">${s.here.length} video(s) here · ${esc(payTerms(c))}</span></div>
+        <div class="right">${s.review ? `<span class="pill Submitted">${s.review} to review</span>` : ''}<div><b>${money(s.owed)}</b> <span class="small muted">owed</span></div></div></div>
+    </div>`).join('') : '<div class="empty">No creators yet. Add a link and they appear here.</div>'}`;
+}
+
+function openCreator(handle) {
+  const c = S.creators.find(x => x.handle === handle);
+  const s = creatorSummary(c), st = S.settings;
+  const f = (k, l, ph, mode) => `<div><label>${l}</label><input data-f="${k}" ${mode ? `inputmode="${mode}"` : ''} value="${esc(c[k] ?? '')}" placeholder="${esc(ph ?? '')}"></div>`;
+  const vids = s.here;
+  sheet(`
+    <h2>@${esc(c.handle)}</h2>
+    <div class="row small"><a href="https://www.tiktok.com/@${encodeURIComponent(c.handle)}" target="_blank" rel="noopener">TikTok profile ↗</a>
+      <span class="muted">· ${money(s.paid)} paid all-time</span></div>
+
+    <h3 style="margin:16px 0 4px;font-size:16px">Videos in “${esc(current()?.name)}”</h3>
+    <div class="small muted">Tick videos to pay. Already-paid ones are marked ✅.</div>
+    <div id="payList">${vids.length ? vids.map(v => `<label class="check" style="margin:0;color:inherit;font-size:14px">
+        <input type="checkbox" value="${esc(v.id)}" ${v.status === 'Approved' ? 'checked' : ''} ${v.status === 'Rejected' ? 'disabled' : ''} onchange="updatePayBox('${esc(c.handle)}')">
+        <span class="grow">${v.status === 'Paid' ? '✅ PAID · ' : ''}${day(v.posted_at)} · ${compact(v.views)} views · …${esc(v.id.slice(-6))}</span>
+        <span class="right"><span class="pill ${v.status}">${v.status}</span><br><span class="small">${v.status === 'Paid' ? money(v.paid_total) : money(v.owed)}</span></span>
+      </label>`).join('') : '<div class="muted small" style="padding:8px 0">No videos in this campaign.</div>'}</div>
+    <div id="payBox"></div>
+
+    <h3 style="margin:18px 0 0;font-size:16px">Profile & pay rules</h3>
+    <div class="grid2" id="cForm">
+      ${f('name', 'Name')}${f('contact', 'Contact', 'email, Discord…')}
+      ${f('payout_method', 'Payout method', 'PayPal, Venmo…')}${f('payout_details', 'Payout details', 'email / @handle')}
+      ${f('rate_per_video', 'Flat $ per video', 'default ' + st.default_rate, 'decimal')}${f('cpm', '$ per 1K views', 'default ' + st.default_cpm, 'decimal')}
+      ${f('bonus_tiers', 'View bonus tiers', st.default_bonus_tiers || 'e.g. 100k=25, 1m=150')}${f('max_per_video', 'Max $ per video', 'default ' + (Number(st.default_max) || 'none'), 'decimal')}
+    </div>
+    ${f('notes', 'Notes')}
+    <div class="row" style="margin-top:14px">
+      <button class="primary grow" onclick="saveCreator('${esc(c.handle)}')">Save profile</button>
+      <button onclick="closeSheet()">Close</button>
+    </div>`);
+  updatePayBox(handle);
+}
+
+function updatePayBox(handle) {
+  const c = S.creators.find(x => x.handle === handle);
+  const ids = [...document.querySelectorAll('#payList input:checked')].map(i => i.value);
+  const picked = S.videos.filter(v => ids.includes(v.id));
+  const repeat = picked.filter(v => v.status === 'Paid');
+  const total = picked.reduce((s, v) => s + Number(v.owed), 0);
+  $('#payBox').innerHTML = !picked.length ? '' : `
+    <div class="card" style="margin-top:10px;background:var(--bg)">
+      <b>Pay ${picked.length} video(s)</b>
+      ${repeat.length ? `<div class="warnbox">⚠ ${repeat.length} of these ${repeat.length === 1 ? 'is' : 'are'} already paid (✅).
+        <label><input type="checkbox" id="payAgain"> Yes, pay again on purpose</label></div>` : ''}
+      <div class="grid2">
+        <div><label>Amount (change for a batch deal)</label><input id="pAmount" inputmode="decimal" value="${total.toFixed(2)}"></div>
+        <div><label>Method</label><input id="pMethod" value="${esc(c.payout_method)}" placeholder="PayPal, Venmo…"></div>
+        <div><label>Reference / transaction ID</label><input id="pRef"></div>
+        <div><label>Notes</label><input id="pNotes"></div>
+      </div>
+      ${c.payout_details ? `<div class="small muted" style="margin-top:6px">Send to: ${esc(c.payout_details)}</div>` : ''}
+      <button class="primary" style="width:100%;margin-top:10px" onclick="pay('${esc(handle)}')">Record payment</button>
+    </div>`;
+}
+
+async function pay(handle) {
+  const ids = [...document.querySelectorAll('#payList input:checked')].map(i => i.value);
+  const again = $('#payAgain');
+  if (again && !again.checked) return toast('Some videos are already paid. Tick “Yes, pay again” if that’s intentional.');
+  const { error } = await sb.rpc('create_payout', {
+    p_creator: handle, p_video_ids: ids, p_amount: numOrNull($('#pAmount').value),
+    p_method: $('#pMethod').value.trim(), p_reference: $('#pRef').value.trim(), p_notes: $('#pNotes').value.trim(),
+    p_pay_again: !!(again && again.checked),
+  });
+  if (error) return toast(error.message.startsWith('ALREADY_PAID') ? 'Some videos are already paid. Tick “Yes, pay again”.' : error.message);
+  closeSheet(); toast('Payment recorded'); await loadAll();
+}
+
+async function saveCreator(handle) {
+  const fields = {};
+  document.querySelectorAll('.sheet [data-f]').forEach(i => {
+    const k = i.dataset.f, val = i.value.trim();
+    fields[k] = ['rate_per_video', 'cpm', 'max_per_video'].includes(k) ? numOrNull(val)
+      : k === 'bonus_tiers' ? (val || null) : val;
+  });
+  await q(sb.from('creators').update(fields).eq('handle', handle));
+  closeSheet(); toast('Saved @' + handle); await loadAll();
+}
+
+// ---------- Payouts ----------
+function viewPayouts() {
+  const ids = new Set(campVideos().map(v => v.id));
+  const here = S.payouts.filter(p => p.payout_items.some(i => ids.has(i.video_id)));
+  const rest = S.payouts.filter(p => !here.includes(p));
+  const card = p => `<div class="card"><div class="item"><div class="main"><b>@${esc(p.creator)} · ${money(p.amount)}</b>
+    <span class="small muted">${esc(p.code)} · ${day(p.paid_at)} · ${p.payout_items.length} video(s)${p.method ? ' · ' + esc(p.method) : ''}${p.reference ? ' · ' + esc(p.reference) : ''}</span>
+    ${p.notes ? `<div class="small">${esc(p.notes)}</div>` : ''}</div></div></div>`;
+  return `${here.length ? here.map(card).join('') : '<div class="empty">No payments in this campaign yet. Open a creator to pay them.</div>'}
+    ${rest.length ? `<h3 class="muted small" style="margin:18px 0 8px">OTHER CAMPAIGNS</h3>${rest.map(card).join('')}` : ''}`;
+}
+
+// ---------- Campaigns ----------
+function viewCampaigns() {
+  const cur = current();
+  return `${S.campaigns.map(c => `<div class="card">
+      <div class="item"><span class="dot" style="background:${colorOf(c)}"></span>
+        <div class="main"><b>${esc(c.name)} ${c.id === cur?.id ? '<span class="pill Approved">current</span>' : ''}</b>
+          <span class="small muted">Started ${day(c.started_at)} · ${c.videos_count} videos</span></div>
+        <div class="right"><b>${money(c.total_spent)}</b><div class="small muted">spent · ${money(c.still_owed)} owed</div></div></div>
+      <div class="row" style="margin-top:10px">
+        ${c.id === cur?.id ? '' : `<button class="grow" onclick="switchCampaign('${c.id}')">Switch to this</button>`}
+        <button class="grow" onclick="openCampaignForm('${c.id}')">Edit</button>
+      </div></div>`).join('')}
+    <button class="primary" style="width:100%" onclick="openCampaignForm()">＋ New campaign</button>`;
+}
+
+async function switchCampaign(id) {
+  await q(sb.from('settings').update({ current_campaign_id: id }).eq('id', 1));
+  closeSheet(); S.videoFilter = 'all'; await loadAll();
+  toast('Now adding to “' + current().name + '”');
+}
+
+function openCampaignPicker() {
+  const cur = current();
+  sheet(`<h2>Switch campaign</h2>
+    ${S.campaigns.filter(c => !c.archived || c.id === cur?.id).map(c => `<div class="card item" onclick="switchCampaign('${c.id}')">
+      <span class="dot" style="background:${colorOf(c)}"></span><div class="main"><b>${esc(c.name)}</b>
+      <span class="small muted">${c.videos_count} videos · ${money(c.total_spent)} spent</span></div>
+      ${c.id === cur?.id ? '<span class="pill Approved">current</span>' : ''}</div>`).join('')}
+    <div class="row"><button class="primary grow" onclick="openCampaignForm()">＋ New campaign</button><button onclick="closeSheet()">Close</button></div>`);
+}
+
+function openCampaignForm(id) {
+  const c = S.campaigns.find(x => x.id === id) || { name: '', color: Object.keys(COLORS).find(k => !S.campaigns.some(x => x.color === k)) || 'blue' };
+  sheet(`<h2>${id ? 'Edit campaign' : 'New campaign'}</h2>
+    <label>Name</label><input id="cName" value="${esc(c.name)}" placeholder="e.g. Winter Push">
+    <label>Color (the whole app turns this color while it's the current campaign)</label>
+    <div class="colors" id="cColors">${Object.entries(COLORS).map(([k, hex]) => `<button data-c="${k}" class="${k === c.color ? 'on' : ''}" style="background:${hex}" onclick="document.querySelectorAll('#cColors button').forEach(b=>b.classList.toggle('on', b===this))"></button>`).join('')}</div>
+    ${id ? `<label class="row" style="color:inherit;font-size:14px"><input type="checkbox" id="cArchived" style="width:auto" ${c.archived ? 'checked' : ''}> Hide from the switcher (finished)</label>` : ''}
+    <div class="row" style="margin-top:16px">
+      <button class="primary grow" onclick="saveCampaign(${id ? `'${id}'` : ''})">${id ? 'Save' : 'Create and switch to it'}</button>
+      <button onclick="closeSheet()">Cancel</button></div>`);
+}
+
+async function saveCampaign(id) {
+  const name = $('#cName').value.trim();
+  if (!name) return toast('Give the campaign a name.');
+  const color = document.querySelector('#cColors button.on')?.dataset.c || 'blue';
+  if (id) {
+    await q(sb.from('campaigns').update({ name, color, archived: !!$('#cArchived')?.checked }).eq('id', id));
+    closeSheet(); await loadAll();
+  } else {
+    const row = await q(sb.from('campaigns').insert({ name, color }).select().single());
+    await switchCampaign(row.id);
+  }
+}
+
+// ---------- Settings ----------
+function openSettings() {
+  const s = S.settings;
+  sheet(`<h2>Settings</h2>
+    <div class="small muted">Default pay rules, used when a creator doesn't have their own.</div>
+    <div class="grid2" id="sForm">
+      <div><label>Flat $ per video</label><input data-s="default_rate" inputmode="decimal" value="${s.default_rate}"></div>
+      <div><label>$ per 1K views</label><input data-s="default_cpm" inputmode="decimal" value="${s.default_cpm}"></div>
+      <div><label>View bonus tiers</label><input data-s="default_bonus_tiers" value="${esc(s.default_bonus_tiers)}" placeholder="100k=25, 1m=150"></div>
+      <div><label>Max $ per video (0 = none)</label><input data-s="default_max" inputmode="decimal" value="${s.default_max}"></div>
+      <div><label>Refresh stats for (days after posting)</label><input data-s="track_stats_days" inputmode="numeric" value="${s.track_stats_days}"></div>
+    </div>
+    <button class="primary" style="width:100%;margin-top:12px" onclick="saveSettings()">Save settings</button>
+    <h3 style="margin:18px 0 6px;font-size:16px">View stats</h3>
+    <div class="small muted">Refreshes automatically every morning. Last run: ${s.last_stats_run ? new Date(s.last_stats_run).toLocaleString() : 'never'}</div>
+    <button style="width:100%;margin-top:8px" id="statsBtn" onclick="refreshStats()">Refresh stats now</button>
+    <div class="row" style="margin-top:18px"><span class="small muted grow">Signed in as ${esc(S.session.user.email)}</span>
+      <button onclick="sb.auth.signOut()">Sign out</button><button onclick="closeSheet()">Close</button></div>`);
+}
+
+async function saveSettings() {
+  const fields = {};
+  document.querySelectorAll('[data-s]').forEach(i => {
+    fields[i.dataset.s] = i.dataset.s === 'default_bonus_tiers' ? i.value.trim() : (numOrNull(i.value) ?? 0);
+  });
+  await q(sb.from('settings').update(fields).eq('id', 1));
+  closeSheet(); toast('Settings saved'); await loadAll();
+}
+
+async function refreshStats() {
+  $('#statsBtn').disabled = true; $('#statsBtn').textContent = 'Refreshing… (up to a minute)';
+  const { data, error } = await sb.functions.invoke('refresh-stats', { body: {} });
+  closeSheet();
+  if (error) return toast(error.message);
+  toast(`Stats updated for ${data.updated} video(s)` + (data.failed ? `, ${data.failed} couldn't be fetched` : ''));
+  await loadAll();
+}
+
+// ---------- Sheet ----------
+function sheet(html) {
+  closeSheet();
+  const bg = document.createElement('div');
+  bg.className = 'sheet-bg'; bg.id = 'sheet';
+  bg.innerHTML = `<div class="sheet">${html}</div>`;
+  bg.addEventListener('click', e => { if (e.target === bg) closeSheet(); });
+  document.body.appendChild(bg);
+}
+function closeSheet() { $('#sheet')?.remove(); }
+
+init();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
