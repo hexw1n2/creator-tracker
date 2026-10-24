@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#2563eb" id="themeColor">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://kitugmudlzqltsajqipt.supabase.co wss://kitugmudlzqltsajqipt.supabase.co; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
 <title>Creator Tracker</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -104,7 +106,10 @@ const COLORS = {
 };
 const STATUSES = ['Submitted', 'Approved', 'Rejected', 'Paid'];
 
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// A password-reset email link opens the app with #...type=recovery; remember that before the client consumes it.
+// Implicit flow so the link works even when the email app opens it in a different browser.
+let RECOVERY = /type=recovery/.test(location.hash);
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { flowType: 'implicit' } });
 
 // ---------- State ----------
 const S = {
@@ -115,6 +120,8 @@ const S = {
 // ---------- Helpers ----------
 const $ = sel => document.querySelector(sel);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const js = v => esc(JSON.stringify(v));   // a value passed into an inline onclick="fn(...)"
+const tiktokUrl = u => { try { const x = new URL(u); return x.protocol === 'https:' && /(^|\.)tiktok\.com$/.test(x.hostname) ? x.href : '#'; } catch (e) { return '#'; } };
 const money = n => '$' + (Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const compact = n => n == null ? '–' : Number(n).toLocaleString(undefined, { notation: 'compact', maximumFractionDigits: 1 });
 const day = iso => iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
@@ -164,9 +171,10 @@ async function loadAll() {
 async function init() {
   const { data } = await sb.auth.getSession();
   S.session = data.session;
-  sb.auth.onAuthStateChange((_e, session) => {
+  sb.auth.onAuthStateChange((event, session) => {
     const changed = !!session !== !!S.session;
     S.session = session;
+    if (event === 'PASSWORD_RECOVERY') { RECOVERY = true; return boot(); }
     if (changed) boot();
   });
   boot();
@@ -174,6 +182,7 @@ async function init() {
 
 async function boot() {
   if (!S.session) return renderLogin();
+  if (RECOVERY) return renderNewPassword();
   const { data } = await sb.rpc('is_owner');
   S.owner = data === true;
   if (!S.owner) {
@@ -194,8 +203,8 @@ function renderLogin(msg) {
     <label>Password</label><input id="pw" type="password" autocomplete="current-password">
     <div class="row" style="margin-top:14px">
       <button class="primary grow" onclick="signIn()">Sign in</button>
-      <button onclick="signUp()">Create account</button>
     </div>
+    <button style="margin-top:10px;background:none;border:0;padding:4px 0;color:var(--accent)" onclick="forgotPassword()">Forgot password?</button>
     <p class="small" id="loginMsg" style="margin-top:12px">${esc(msg || '')}</p>
   </div>`;
 }
@@ -207,13 +216,34 @@ async function signIn() {
   if (error) $('#loginMsg').textContent = error.message;
 }
 
-async function signUp() {
-  const email = $('#em').value.trim(), password = $('#pw').value;
-  if (password.length < 8) { $('#loginMsg').textContent = 'Use at least 8 characters for the password.'; return; }
+async function forgotPassword() {
+  const email = $('#em').value.trim();
+  if (!email) { $('#loginMsg').textContent = 'Type your email above first.'; return; }
   store.set('email', email);
-  const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + location.pathname } });
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  $('#loginMsg').textContent = error ? error.message
+    : 'If that email has an account, a reset link is on its way. Open it on this phone.';
+}
+
+function renderNewPassword(msg) {
+  $('#app').innerHTML = `<div class="login">
+    <h1>Set a new password</h1>
+    <p class="muted">For ${esc(S.session.user.email)}</p>
+    <label>New password (8+ characters)</label><input id="np" type="password" autocomplete="new-password">
+    <button class="primary" style="width:100%;margin-top:14px" onclick="saveNewPassword()">Save password</button>
+    <p class="small" id="loginMsg" style="margin-top:12px">${esc(msg || '')}</p>
+  </div>`;
+}
+
+async function saveNewPassword() {
+  const password = $('#np').value;
+  if (password.length < 8) { $('#loginMsg').textContent = 'Use at least 8 characters.'; return; }
+  const { error } = await sb.auth.updateUser({ password });
   if (error) { $('#loginMsg').textContent = error.message; return; }
-  if (!data.session) $('#loginMsg').textContent = 'Account created. Open the confirmation email, then come back and sign in.';
+  RECOVERY = false;
+  history.replaceState(null, '', location.pathname);
+  toast('Password updated');
+  boot();
 }
 
 // ---------- Render ----------
@@ -326,14 +356,14 @@ function viewVideos() {
 function videoCard(v) {
   const amount = v.status === 'Paid' ? `<span class="small muted">paid</span> ${money(v.paid_total)}` : money(v.owed);
   return `<div class="card">
-    <div class="item" onclick="openVideo('${esc(v.id)}')">
+    <div class="item" onclick="openVideo(${js(v.id)})">
       <div class="main"><b>@${esc(v.creator)}</b>
         <span class="small muted">${day(v.posted_at)} · ${compact(v.views)} views · …${esc(v.id.slice(-6))}</span></div>
       <div class="right"><span class="pill ${v.status}">${v.status}</span><div class="small">${amount}</div></div>
     </div>
     ${v.status === 'Submitted' ? `<div class="row" style="margin-top:10px">
-      <button class="grow" onclick="setStatus('${esc(v.id)}','Approved')">✓ Approve</button>
-      <button class="grow danger" onclick="setStatus('${esc(v.id)}','Rejected')">✕ Reject</button></div>` : ''}
+      <button class="grow" onclick="setStatus(${js(v.id)},'Approved')">✓ Approve</button>
+      <button class="grow danger" onclick="setStatus(${js(v.id)},'Rejected')">✕ Reject</button></div>` : ''}
   </div>`;
 }
 
@@ -349,7 +379,7 @@ function openVideo(id) {
   sheet(`
     <h2>@${esc(v.creator)}</h2>
     <div class="small muted">Posted ${day(v.posted_at)} · ID ${esc(v.id)}</div>
-    <p><a href="${esc(v.url)}" target="_blank" rel="noopener">Open in TikTok ↗</a></p>
+    <p><a href="${esc(tiktokUrl(v.url))}" target="_blank" rel="noopener noreferrer">Open in TikTok ↗</a></p>
     <div class="stats">
       <div class="stat"><b>${compact(v.views)}</b><span>views</span></div>
       <div class="stat"><b>${compact(v.likes)}</b><span>likes</span></div>
@@ -364,8 +394,8 @@ function openVideo(id) {
     </div>
     <label>Notes</label><input id="vNotes" value="${esc(v.notes)}">
     <div class="row" style="margin-top:14px">
-      <button class="primary grow" onclick="saveVideo('${esc(v.id)}')">Save</button>
-      ${paid ? '' : `<button class="danger" onclick="deleteVideo('${esc(v.id)}')">Delete</button>`}
+      <button class="primary grow" onclick="saveVideo(${js(v.id)})">Save</button>
+      ${paid ? '' : `<button class="danger" onclick="deleteVideo(${js(v.id)})">Delete</button>`}
       <button onclick="closeSheet()">Close</button>
     </div>`);
 }
@@ -418,7 +448,7 @@ function viewCreators() {
     .sort((a, b) => b.s.here.length - a.s.here.length || b.s.owed - a.s.owed);
   return `
     <input placeholder="Search creators…" value="${esc(S.creatorSearch)}" oninput="S.creatorSearch=this.value;clearTimeout(window._st);window._st=setTimeout(()=>{render();const i=document.querySelector('main input');i.focus();i.setSelectionRange(i.value.length,i.value.length)},250)" style="margin-bottom:10px">
-    ${rows.length ? rows.map(({ c, s }) => `<div class="card" onclick="openCreator('${esc(c.handle)}')">
+    ${rows.length ? rows.map(({ c, s }) => `<div class="card" onclick="openCreator(${js(c.handle)})">
       <div class="item"><div class="main"><b>@${esc(c.handle)} ${c.name ? `<span class="muted small">${esc(c.name)}</span>` : ''}</b>
         <span class="small muted">${s.here.length} video(s) here · ${esc(payTerms(c))}</span></div>
         <div class="right">${s.review ? `<span class="pill Submitted">${s.review} to review</span>` : ''}<div><b>${money(s.owed)}</b> <span class="small muted">owed</span></div></div></div>
@@ -432,13 +462,13 @@ function openCreator(handle) {
   const vids = s.here;
   sheet(`
     <h2>@${esc(c.handle)}</h2>
-    <div class="row small"><a href="https://www.tiktok.com/@${encodeURIComponent(c.handle)}" target="_blank" rel="noopener">TikTok profile ↗</a>
+    <div class="row small"><a href="https://www.tiktok.com/@${encodeURIComponent(c.handle)}" target="_blank" rel="noopener noreferrer">TikTok profile ↗</a>
       <span class="muted">· ${money(s.paid)} paid all-time</span></div>
 
     <h3 style="margin:16px 0 4px;font-size:16px">Videos in “${esc(current()?.name)}”</h3>
     <div class="small muted">Tick videos to pay. Already-paid ones are marked ✅.</div>
     <div id="payList">${vids.length ? vids.map(v => `<label class="check" style="margin:0;color:inherit;font-size:14px">
-        <input type="checkbox" value="${esc(v.id)}" ${v.status === 'Approved' ? 'checked' : ''} ${v.status === 'Rejected' ? 'disabled' : ''} onchange="updatePayBox('${esc(c.handle)}')">
+        <input type="checkbox" value="${esc(v.id)}" ${v.status === 'Approved' ? 'checked' : ''} ${v.status === 'Rejected' ? 'disabled' : ''} onchange="updatePayBox(${js(c.handle)})">
         <span class="grow">${v.status === 'Paid' ? '✅ PAID · ' : ''}${day(v.posted_at)} · ${compact(v.views)} views · …${esc(v.id.slice(-6))}</span>
         <span class="right"><span class="pill ${v.status}">${v.status}</span><br><span class="small">${v.status === 'Paid' ? money(v.paid_total) : money(v.owed)}</span></span>
       </label>`).join('') : '<div class="muted small" style="padding:8px 0">No videos in this campaign.</div>'}</div>
@@ -453,7 +483,7 @@ function openCreator(handle) {
     </div>
     ${f('notes', 'Notes')}
     <div class="row" style="margin-top:14px">
-      <button class="primary grow" onclick="saveCreator('${esc(c.handle)}')">Save profile</button>
+      <button class="primary grow" onclick="saveCreator(${js(c.handle)})">Save profile</button>
       <button onclick="closeSheet()">Close</button>
     </div>`);
   updatePayBox(handle);
@@ -477,7 +507,7 @@ function updatePayBox(handle) {
         <div><label>Notes</label><input id="pNotes"></div>
       </div>
       ${c.payout_details ? `<div class="small muted" style="margin-top:6px">Send to: ${esc(c.payout_details)}</div>` : ''}
-      <button class="primary" style="width:100%;margin-top:10px" onclick="pay('${esc(handle)}')">Record payment</button>
+      <button class="primary" style="width:100%;margin-top:10px" onclick="pay(${js(handle)})">Record payment</button>
     </div>`;
 }
 
@@ -526,8 +556,8 @@ function viewCampaigns() {
           <span class="small muted">Started ${day(c.started_at)} · ${c.videos_count} videos</span></div>
         <div class="right"><b>${money(c.total_spent)}</b><div class="small muted">spent · ${money(c.still_owed)} owed</div></div></div>
       <div class="row" style="margin-top:10px">
-        ${c.id === cur?.id ? '' : `<button class="grow" onclick="switchCampaign('${c.id}')">Switch to this</button>`}
-        <button class="grow" onclick="openCampaignForm('${c.id}')">Edit</button>
+        ${c.id === cur?.id ? '' : `<button class="grow" onclick="switchCampaign(${js(c.id)})">Switch to this</button>`}
+        <button class="grow" onclick="openCampaignForm(${js(c.id)})">Edit</button>
       </div></div>`).join('')}
     <button class="primary" style="width:100%" onclick="openCampaignForm()">＋ New campaign</button>`;
 }
@@ -541,7 +571,7 @@ async function switchCampaign(id) {
 function openCampaignPicker() {
   const cur = current();
   sheet(`<h2>Switch campaign</h2>
-    ${S.campaigns.filter(c => !c.archived || c.id === cur?.id).map(c => `<div class="card item" onclick="switchCampaign('${c.id}')">
+    ${S.campaigns.filter(c => !c.archived || c.id === cur?.id).map(c => `<div class="card item" onclick="switchCampaign(${js(c.id)})">
       <span class="dot" style="background:${colorOf(c)}"></span><div class="main"><b>${esc(c.name)}</b>
       <span class="small muted">${c.videos_count} videos · ${money(c.total_spent)} spent</span></div>
       ${c.id === cur?.id ? '<span class="pill Approved">current</span>' : ''}</div>`).join('')}
@@ -556,7 +586,7 @@ function openCampaignForm(id) {
     <div class="colors" id="cColors">${Object.entries(COLORS).map(([k, hex]) => `<button data-c="${k}" class="${k === c.color ? 'on' : ''}" style="background:${hex}" onclick="document.querySelectorAll('#cColors button').forEach(b=>b.classList.toggle('on', b===this))"></button>`).join('')}</div>
     ${id ? `<label class="row" style="color:inherit;font-size:14px"><input type="checkbox" id="cArchived" style="width:auto" ${c.archived ? 'checked' : ''}> Hide from the switcher (finished)</label>` : ''}
     <div class="row" style="margin-top:16px">
-      <button class="primary grow" onclick="saveCampaign(${id ? `'${id}'` : ''})">${id ? 'Save' : 'Create and switch to it'}</button>
+      <button class="primary grow" onclick="saveCampaign(${id ? js(id) : ''})">${id ? 'Save' : 'Create and switch to it'}</button>
       <button onclick="closeSheet()">Cancel</button></div>`);
 }
 

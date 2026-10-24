@@ -1,5 +1,5 @@
 // Caches the app shell so it opens instantly and installs as an app. Data always comes live from Supabase.
-const CACHE = 'tracker-v1';
+const CACHE = 'tracker-v2';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'vendor/supabase-2.117.3.js'];
 
 self.addEventListener('install', e => {
